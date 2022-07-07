@@ -1,115 +1,150 @@
-<template>
-    <div class="balances mt-3">
-        <p class="mb-1 font-weight-bold small">
-            {{ $t('balances_lbl') }}
-        </p>
-        <table class="table small table-striped table-sm">
-            <span v-if="errored">
-                {{ $t('balances_error') }}
-            </span>
-            <tbody v-if="balances != null">
-                <tr
-                    v-for="balance in balances"
-                    :key="balance.id"
-                >
-                    <td class="text-left">
-                        <span class="small">{{ balance.prefix }}</span>
-                        {{ balance.asset_name }}
-                    </td>
-                    <td class="text-right">
-                        {{ balance.balance }}
-                    </td>
-                </tr>
-                <tr v-if="balances.length == 0">
-                    <td class="text-left">
-                        <span class="small" />No balances
-                    </td>
-                    <td class="text-right">
-                        -
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</template>
-<script>
-    import getBlockchain from "../lib/blockchains/blockchainFactory";
-    import { EventBus } from "../lib/event-bus.js";
+<script setup>
+    import { watch, watchEffect, ref, computed, onMounted, inject } from "vue";
+    import { useI18n } from 'vue-i18n';
+    import getBlockchainAPI from "../lib/blockchains/blockchainFactory";
+    import store from '../store/index';
     import RendererLogger from "../lib/RendererLogger";
+
+    const emitter = inject('emitter');
+    const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
 
-    export default {
-        name: "Balances",
-        i18nOptions: { namespaces: "common" },
-        data() {
-            return {
-                balances: null,
-                errored: false
-            };
-        },
-        computed: {
-            selectedAccount() {
-                return this.$store.state.AccountStore.accountlist[
-                    this.$store.state.AccountStore.selectedIndex
-                ];
-            },
-            selectedChain() {
-                return this.selectedAccount.chain;
-            },
-            accountName() {
-                return this.selectedAccount.accountName;
-            },
-            accountID() {
-                return this.selectedAccount.accountID;
-            },
-            accountlist() {
-                return this.$store.state.AccountStore.accountlist;
-            }
-        },
-        watch: {
-            selectedAccount: async function(newAcc, oldAcc) {
-                if (
-                    newAcc.chain != oldAcc.chain ||
-                    newAcc.accountID != oldAcc.accountID
-                ) {
-                    await this.getBalances();
-                    EventBus.$emit("balances", "loaded");
-                }
-            }
-        },
-        mounted() {
-            logger.debug("Balances Table Mounted");
-        },
-        methods: {
-            getBalances: async function() {
-                try {
-                    let blockchain = getBlockchain(this.selectedChain);
-                    let balances = await blockchain.getBalances(this.accountName);
-                    this.balances = balances;
-                } catch (error) {
-                    console.error(error);
-                    this.errored = true;
-                }
-            },
-            formatMoney: function(n, decimals, decimal_sep, thousands_sep) {
-                var c = isNaN(decimals) ? 2 : Math.abs(decimals),
-                    d = decimal_sep || ".",
-                    t = typeof thousands_sep === "undefined" ? "," : thousands_sep,
-                    sign = n < 0 ? "-" : "",
-                    i = parseInt((n = Math.abs(n).toFixed(c))) + "",
-                    j = (j = i.length) > 3 ? j % 3 : 0;
-                return (
-                    sign +
-                    (j ? i.substr(0, j) + t : "") +
-                    i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) +
-                    (c
-                        ? d +
-                            Math.abs(n - i)
-                                .toFixed(c)
-                                .slice(2)
-                        : "")
-                );
+    const props = defineProps({
+        account: {
+            type: Object,
+            required: true,
+            default() {
+                return {}
             }
         }
-    };
+    });
+
+    let balances = ref();
+    let isConnected = ref();
+    let isConnecting = ref();
+
+    let token = ref(0);
+    let assetText = ref('');
+
+    /**
+     * Fetch blockchain account balances
+     * @returns {Array}
+     */
+    async function fetchBalances(chain, name) {
+        isConnecting.value = true;
+        return getBlockchainAPI(chain).getBalances(name)
+            .then(result => {
+                console.log(result);
+                isConnected.value = true;
+                isConnecting.value = false;
+                return result;
+            })
+            .catch(error => {
+                console.log(error);
+                isConnected.value = false;
+                isConnecting.value = false;
+            });
+    }
+
+    /**
+     * On demand load the balances
+     */
+    async function loadBalances() {
+        if (selectedChain.value !== '' && accountName.value !== '') {
+            balances.value = await fetchBalances(selectedChain.value, accountName.value)
+        }
+    }
+
+    let selectedChain = computed(() => {
+        return props.account.chain;
+    });
+
+    let accountName = computed(() => {
+        return props.account.accountName;
+    });
+
+    let accountID = computed(() => {
+        return props.account.accountID;
+    });
+
+    watchEffect(async () => {
+        if (selectedChain.value !== '' && accountName.value !== '') {
+            balances.value = await fetchBalances(selectedChain.value, accountName.value)
+        }
+    });
+
+    watchEffect(() => {
+        assetText.value = balances.value && balances.value.length
+            ? `${balances.value[token.value].balance} ${balances.value[token.value].prefix} ${balances.value[token.value].asset_name}`
+            : `???`;
+    }
+    );
 </script>
+
+<template>
+    <div>
+        <p class="mb-1 font-weight-bold small">
+            {{ t('common.balances_lbl') }}
+        </p>
+        <ui-card
+            elevated
+            class="wideCard"
+        >
+            <ui-list>
+                <ui-item
+                    v-if="balances && balances.length > 0"
+                    :key="balances[token]"
+                >
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            {{ assetText }}
+                        </ui-item-text1>
+                    </ui-item-text-content>
+                    <ui-card-actions v-if="balances.length > 1">
+                        <ui-pagination
+                            v-model="token"
+                            :total="balances.length"
+                            show-total
+                            mini
+                        />
+                    </ui-card-actions>
+                </ui-item>
+                <ui-item v-else-if="balances && !balances.length">
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            No balances in account
+                        </ui-item-text1>
+                    </ui-item-text-content>
+                </ui-item>
+                <ui-item v-else-if="isConnecting || !balances">
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            Connecting to blockchain
+                        </ui-item-text1>
+                    </ui-item-text-content>
+                </ui-item>
+                <ui-item v-else>
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            {{ t('common.balances_error') }}
+                        </ui-item-text1>
+                    </ui-item-text-content>
+                </ui-item>
+                <ui-button
+                    v-if="isConnected || balances"
+                    class="step_btn"
+                    @click="loadBalances()"
+                >
+                    Refresh balances
+                </ui-button>
+                <ui-button
+                    v-else-if="!isConnected && !isConnecting"
+                    class="step_btn"
+                    @click="loadBalances()"
+                >
+                    Reconnect
+                </ui-button>
+            </ui-list>
+        </ui-card>
+    </div>
+</template>

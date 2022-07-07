@@ -33,6 +33,20 @@ body {
     overflow: hidden;
     border-radius: 0.4rem;
 
+    .wideCard {
+      min-width: 100%;
+      width: 100%;
+    }
+
+    .divider {
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+
+    .step_btn {
+        margin: 5px;
+    }
+
     .smallHeader {
         justify-content: center;
 
@@ -64,6 +78,7 @@ body {
     .top {
         padding: 15px;
         background: $dark;
+        text-align: center;
         color: white;
         position: relative;
     }
@@ -75,13 +90,13 @@ body {
         line-height: 2rem;
 
         .title {
-            width: calc(100% - 10rem);
             margin: auto;
             -webkit-app-region: drag;
         }
 
         .frame-controls {
             font-size: 0.6rem;
+            background: $dark;
             position: fixed;
             right: 0;
             top: 0;
@@ -102,12 +117,16 @@ body {
         padding: 15px;
         padding-top: 0;
         padding-bottom: 0;
+        text-align: center;
         color: #222222;
         background: white;
         display: flex;
         flex-direction: column;
         height: 100%;
         justify-content: space-between;
+        a {
+          text-decoration: none;
+        }
     }
 }
 
@@ -139,7 +158,7 @@ body {
     background: $alternate;
     border: 1px solid $alternate;
     outline: none !important;
-    box-shadow: none !important;    
+    box-shadow: none !important;
     box-shadow: 0px 2px 6px 1px rgba(0,0,0,0.3) !important;
 }
 .error {
@@ -202,6 +221,26 @@ body {
     border-radius: 1rem;
     padding: 0rem 0rem;
 }
+
+.acc-info {
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.acc-form-control {
+    position: relative;
+    color: black;
+    box-sizing: border-box;
+    height: auto;
+    padding: 0.4rem;
+    font-size: 1rem;
+    display: inline-block;
+    top: 0;
+    width: 98%;
+    margin: 0.4rem;
+    box-shadow: 0px 2px 6px 1px rgba(0,0,0,0.3) !important;
+}
+
 .form-control {
     position: relative;
     box-sizing: border-box;
@@ -329,13 +368,13 @@ p {
     border: 1px solid #ced4da;
     padding-left: 1rem;
     .multiselect__content-wrapper {
-        position:absolute; 
+        position:absolute;
         z-index:100;
         width:100%;
         top: 3.4rem;
         left:0;
         background:white;
-        box-shadow: 0px 2px 6px 1px rgba(0,0,0,0.3) !important;        
+        box-shadow: 0px 2px 6px 1px rgba(0,0,0,0.3) !important;
         border: 1px solid #ced4da;
         .multiselect__content {
             list-style:none;
@@ -538,6 +577,9 @@ pre {
 }
 
 .content {
+    max-height: 30rem;
+    overflow-y: auto;
+    overflow-x: hidden;
     flex-grow: 1;
 }
 

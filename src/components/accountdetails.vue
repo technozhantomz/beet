@@ -1,74 +1,96 @@
-<template>
-    <div class="account-details mt-3">
-        <p class="mb-1 font-weight-bold small">
-            {{ $t('account_details_lbl') }}
-        </p>
-        <table class="table small table-striped table-sm">
-            <tbody v-if="account">
-                <tr>
-                    <td class="text-left">
-                        {{ $t('account_details_chaim_lbl') }}
-                    </td>
-                    <td class="text-right">
-                        {{ getChainLabel(account.chain) }}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="text-left">
-                        {{ getAccessType(account.chain) == "account" ? $t('account_details_name_lbl') : $t('account_details_address_lbl') }}
-                    </td>
-                    <td class="text-right">
-                        {{ account.accountName }}
-                    </td>
-                </tr>
-                <tr v-if="account.accountName != account.accountID">
-                    <td class="text-left">
-                        {{ $t('account_details_id_lbl') }}
-                    </td>
-                    <td class="text-right">
-                        {{ account.accountID }}
-                    </td>
-                </tr>
-                <tr v-if="getExplorer(account)">
-                    <td class="text-left">
-                        {{ $t('account_details_explorer_lbl') }}
-                    </td>
-                    <td class="text-right">
-                        <a
-                            href="#"
-                            @click="openExplorer(account)"
-                        >
-                            Click here
-                        </a>
-                    </td>
-                </tr>
-            </tbody>
-            <tbody v-else />
-        </table>
-    </div>
-</template>
-<script>
-    import getBlockchain from "../lib/blockchains/blockchainFactory";
-    import {formatChain} from "../lib/formatter";    
+<script setup>
+    import { computed } from 'vue';
+    import getBlockchainAPI from "../lib/blockchains/blockchainFactory";
+    import {formatChain} from "../lib/formatter";
     import { shell } from 'electron';
+    import { useI18n } from 'vue-i18n';
+    const { t } = useI18n({ useScope: 'global' });
 
-    export default {
-        name: "AccountDetails",
-        i18nOptions: { namespaces: "common" },
-        props: ["account"],
-        methods: {
-            getChainLabel: function(chain) {
-                return formatChain(chain);
-            },
-            getExplorer: function(account) {
-                return getBlockchain(account.chain).getExplorer(account);
-            },
-            getAccessType: function(chain) {
-                return getBlockchain(chain).getAccessType();
-            },
-            openExplorer: function(account) {
-                shell.openExternal(this.getExplorer(account));
+    const props = defineProps({
+        account: {
+            type: Object,
+            required: true,
+            default() {
+                return {}
             }
         }
-    };
+    });
+
+    let chainLabel = computed(() => {
+        return formatChain(props.account.chain);
+    });
+
+    let explorer = computed(() => {
+        return getBlockchainAPI(props.account.chain).getExplorer(props.account);
+    });
+
+    let accessType = computed(() => {
+        let type = getBlockchainAPI(props.account.chain).getAccessType();
+        return type == "account"
+            ? t('common.account_details_name_lbl')
+            : t('common.account_details_address_lbl');
+    });
+
+    function openExplorer(account) {
+        // TODO: Copy/Paste link for external browser instead?
+        shell.openExternal(explorer.value);
+    }
+
 </script>
+
+<template>
+    <div>
+        <p>
+            {{ t('common.account_details_lbl') }}
+        </p>
+        <ui-card
+            elevated
+            class="wideCard"
+        >
+            <ui-list v-if="account">
+                <ui-item :key="chainLabel">
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            {{ t('common.account_details_chaim_lbl') }}
+                        </ui-item-text1>
+                        <ui-item-text2>
+                            {{ chainLabel }}
+                        </ui-item-text2>
+                    </ui-item-text-content>
+                </ui-item>
+                <ui-item :key="account.accountName">
+                    <ui-item-text-content>
+                        <ui-item-text1>
+                            {{ accessType }}
+                        </ui-item-text1>
+                        <ui-item-text2>
+                            {{ account.accountName }}
+                        </ui-item-text2>
+                    </ui-item-text-content>
+                </ui-item>
+                <ui-item :key="account.accountID">
+                    <ui-item-text-content v-if="account.accountName != account.accountID">
+                        <ui-item-text1>
+                            {{ t('common.account_details_id_lbl') }}
+                        </ui-item-text1>
+                        <ui-item-text2>
+                            {{ account.accountID }}
+                        </ui-item-text2>
+                    </ui-item-text-content>
+                </ui-item>
+            </ui-list>
+
+            <ui-card-actions
+                v-if="explorer"
+                full-bleed
+            >
+                <ui-button
+                    class="step_btn"
+                    @click="openExplorer(account)"
+                >
+                    {{ t('common.account_details_explorer_lbl') }}
+                </ui-button>
+            </ui-card-actions>
+        </ui-card>
+    </div>
+</template>

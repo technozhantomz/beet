@@ -141,17 +141,6 @@ const linkHandler = async (req) => {
       return rejectRequest(req, error);
     }
 
-    let app = store.getters['OriginStore/getBeetApp']({payload: {identityhash: identityhash}});
-    if (app) {
-      console.log('relink');
-      return Object.assign(req, {
-          isLinked: true, // todo: can this also be called link?
-          identityhash: identityhash,
-          app: app,
-          existing: true
-      });
-    }
-
     let secret;
     try {
       secret = await ed.getSharedSecret(req.key, req.payload.pubkey);
@@ -159,6 +148,7 @@ const linkHandler = async (req) => {
       return rejectRequest(req, error);
     }
 
+    let app;
     try {
       app = await store.dispatch('OriginStore/addApp', {
           appName: req.appName,
@@ -226,9 +216,12 @@ export default class BeetServer {
 
       let decryptedValue;
       try {
-        decryptedValue = aes.decrypt(data.payload, key).toString(ENC);
+        decryptedValue = aes.decrypt((data.payload).toString(), key).toString(ENC);
       } catch (error) {
         console.log(error);
+      }
+
+      if (!decryptedValue) {
         socket.emit("api", {id: data.id, error: true, payload: {code: 3, message: "Could not decrypt message"}});
         return;
       }
@@ -396,19 +389,15 @@ export default class BeetServer {
         io.on("connection", async (socket) => {
           socket.isAuthenticated = false;
 
-          socket.emit("connected", socket.id);
-
-          socket.on("ping", (callback) => {
-            console.log("ping")
-            callback(true)
+          socket.on("ping", (data) => {
+            socket.emit("pong", data);
           });
 
           /*
            * Wallet handshake with client.
            */
-          socket.on("authenticate", async (data, ackCallback) => {
+          socket.on("authenticate", async (data) => {
             logger.debug("incoming authenticate request", data);
-
             if (!store.state.WalletStore.isUnlocked) {
               console.log(`locked wallet: ${store.state.WalletStore.isUnlocked}`)
               socket.emit("api", {id: data.id, error: true, payload: {code: 7, message: "Beet wallet authentication error."}});
@@ -469,16 +458,18 @@ export default class BeetServer {
               return;
             }
 
-            ackCallback({
-                id: status.id,
-                error: false,
-                payload: {
-                    authenticate: true,
-                    link: false,
-                    pub_key: ed.utils.bytesToHex(pubk),
+            socket.emit(
+                'authenticated',
+                {
+                    id: status.id,
+                    error: false,
+                    payload: {
+                        authenticate: true,
+                        link: false,
+                        pub_key: ed.utils.bytesToHex(pubk),
+                    }
                 }
-            })
-
+            )
           });
 
           /*
@@ -534,12 +525,12 @@ export default class BeetServer {
               return;
             }
 
-            logger.debug("processing api request");
+            //logger.debug("processing api request");
 
             try {
               await this.respondAPI(socket, data);
             } catch (error) {
-              console.log(error);
+              //console.log(error);
               if (socket) {
                 socket.emit("api", {id: data.id, error: true, payload: {code: 7, message: "API request unsuccessful."}});
               }

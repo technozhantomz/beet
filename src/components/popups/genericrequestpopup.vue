@@ -2,9 +2,11 @@
     import { ipcRenderer } from 'electron';
     import { onMounted, computed } from "vue";
     import { useI18n } from 'vue-i18n';
-    const { t } = useI18n({ useScope: 'global' });
-
     import RendererLogger from "../../lib/RendererLogger";
+
+    import langSelect from "../lang-select.vue";
+
+    const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
 
     const props = defineProps({
@@ -38,6 +40,13 @@
         return props.payload.generic.rejectText ?? t('operations.rawsig.reject_btn');
     });
 
+    let votePrompt = computed(() => {
+        if (!props.payload) {
+            return '';
+        }
+        return props.payload.generic.details.split(/\r?\n/);
+    });
+
     onMounted(() => {
         logger.debug("Req Popup initialised");
     });
@@ -61,28 +70,39 @@
             }
         );
     }
-
 </script>
 
 <template>
-    {{ props.payload.generic.message }}:
-    <br>
-    <br>
-    <pre class="text-left custom-content">
-          <code>{{ props.payload.generic.details }}</code>
-        </pre>
+    <div style="padding:5px">
+        <p>
+            {{ props.payload.generic.message }}:
+        </p>
 
-    <ui-button
-        raised
-        @click="_clickedAllow()"
-    >
-        {{ acceptText }}
-    </ui-button>
+        <ui-list>
+            <ui-item
+                v-for="item in votePrompt"
+                :key="item"
+            >
+                <ui-item-text-content>
+                    {{ item }}
+                </ui-item-text-content>
+            </ui-item>
+        </ui-list>
 
-    <ui-button
-        outlined
-        @click="_clickedDeny()"
-    >
-        {{ rejectText }}
-    </ui-button>
+        <ui-button
+            raised
+            style="margin-right:5px"
+            @click="_clickedAllow()"
+        >
+            {{ acceptText }}
+        </ui-button>
+
+        <ui-button
+            outlined
+            @click="_clickedDeny()"
+        >
+            {{ rejectText }}
+        </ui-button>
+        <langSelect location="prompt" />
+    </div>
 </template>

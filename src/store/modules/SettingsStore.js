@@ -81,13 +81,50 @@ const actions = {
                 reject(error);
             }
 
-            if (!settings && !initialState.settings) {
-              console.log(`no settings state`)
-              reject();
-            } else if (!settings && initialState.settings) {
-              settings = initialState.settings;
+            if (settings && settings.length > 0) {
+                settings = JSON.parse(settings)
+            } else {
+                settings = initialState.settings;
             }
+
             settings.locale = payload.locale;
+            localStorage.setItem("settings", JSON.stringify(settings));
+            commit(LOAD_SETTINGS, settings);
+            resolve();
+        });
+    },
+    /**
+     * 
+     * @param {Object} payload
+     */
+    setChainPermissions({
+        commit
+    }, payload) {
+        return new Promise(async (resolve, reject) => {
+            let settings;
+            try {
+                settings = localStorage.getItem("settings");
+            } catch (error) {
+                console.log(error)
+                reject(error);
+            }
+
+            if (settings && settings.length > 0) {
+                settings = JSON.parse(settings)
+            } else {
+                settings = initialState.settings;
+            }
+
+            if (!settings.hasOwnProperty('chainPermissions')) {
+                settings['chainPermissions'] = {
+                    BTS: [],
+                    BTS_TEST: [],
+                    TUSC: [],
+                    BTC: [],
+                    BTC_TEST: []
+                }
+            }
+            settings.chainPermissions[payload.chain] = payload.rows;
             localStorage.setItem("settings", JSON.stringify(settings));
             commit(LOAD_SETTINGS, settings);
             resolve();
@@ -97,13 +134,27 @@ const actions = {
 
 
 const getters = {
-  getNode: (state) => state.settings.selected_node
+    getNode: (state) => state.settings.selected_node,
+    getLocale: (state) => state.settings.locale,
+    getChainPermissions: (state) => (chain) => {
+        if (!state.settings.hasOwnProperty('chainPermissions')) {
+            return [];
+        }
+        return state.settings.chainPermissions[chain];
+    }
 };
 
 const initialState = {
     settings: {
         locale: defaultLocale,
-        selected_node: {}
+        selected_node: {},
+        chainPermissions: {
+            BTS: [],
+            BTS_TEST: [],
+            TUSC: [],
+            BTC: [],
+            BTC_TEST: []
+        }
     }
 };
 

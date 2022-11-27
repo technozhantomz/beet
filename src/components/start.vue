@@ -55,7 +55,7 @@
             })
             .catch(() => {
                 passincorrect.value = "is-invalid";
-                ipcRenderer.send("notify", 'An attempt to unlock the global pay wallet was made with an invalid password.');
+                ipcRenderer.send("notify", 'An attempt to unlock the Beet wallet was made with an invalid password.');
             });
     }
 </script>
@@ -96,25 +96,24 @@
                     {{ t('common.restore_cta') }}
                 </ui-button>
             </router-link>
-
-            <br>
             <section :dir="null">
                 <ui-select
                     v-if="hasWallet"
                     id="wallet-select"
                     v-model="selectedWallet"
+                    style="width:100%"
                     :options="walletOptions"
                     full-bleed
                     @change="passincorrect=''"
                 >
-                    Global Pay wallet name
+                    Beet wallet name
                 </ui-select>
             </section>
-            <br>
             <input
                 v-if="hasWallet"
                 id="inputPassword"
                 v-model="walletpass"
+                style="width:97%; margin-top: 5px;"
                 type="password"
                 class="form-control mb-4 px-3"
                 :placeholder=" t('common.password_placeholder')"
@@ -122,7 +121,6 @@
                 :class="passincorrect"
                 @focus="passincorrect=''"
             >
-            <br>
             <ui-form-field>
                 <ui-checkbox v-model="legacy" />
                 <label>Legacy account</label>
@@ -131,7 +129,7 @@
             <ui-button
                 v-if="hasWallet"
                 type="submit"
-                outlined
+                raised
                 @click="unlockWallet"
             >
                 {{ t('common.unlock_cta') }}
@@ -146,7 +144,7 @@
             >
                 <ui-button
                     class="step_btn"
-                    outlined
+                    raised
                 >
                     {{ t('common.create_cta') }}
                 </ui-button>
@@ -158,7 +156,7 @@
             >
                 <ui-button
                     class="step_btn"
-                    outlined
+                    raised
                 >
                     {{ t('common.restore_cta') }}
                 </ui-button>

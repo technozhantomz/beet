@@ -8,7 +8,8 @@ import aes from "crypto-js/aes.js";
 import ENC from 'crypto-js/enc-utf8.js';
 import * as ed from '@noble/ed25519';
 
-import { createServer } from "http";
+import https from 'node:https';
+import http from 'node:http';
 import { Server } from "socket.io";
 
 import {
@@ -19,6 +20,7 @@ import {
   injectedCall,
   voteFor,
   signMessage,
+  signNFT,
   messageVerification,
   transfer
 } from './apiUtils.js';
@@ -57,7 +59,7 @@ async function _establishLink(socket, target) {
  * @returns {object}
  */
 function _getLinkResponse(result) {
-    if (!result.isLinked == true) {
+    if (!result.isLinked == true && !result.link == true) {
       return {
           id: result.id,
           error: true,
@@ -125,7 +127,7 @@ const linkHandler = async (req) => {
         userResponse = await relinkRequest(Object.assign(req, {}));
       }
     } catch (error) {
-      return rejectRequest(req, 'User rejected request')
+      return rejectRequest(req, 'User rejected request');
     }
 
     if (!userResponse || !userResponse.result) {
@@ -133,34 +135,39 @@ const linkHandler = async (req) => {
     }
 
     let identityhash;
-    try {
-      identityhash = sha256(
-        req.browser + ' ' + req.origin + ' ' + req.appName + ' ' + userResponse.result.chain + ' ' + userResponse.result.id
-      ).toString();
-    } catch (error) {
-      return rejectRequest(req, error);
-    }
-
-    let secret;
-    try {
-      secret = await ed.getSharedSecret(req.key, req.payload.pubkey);
-    } catch (error) {
-      return rejectRequest(req, error);
-    }
-
     let app;
-    try {
-      app = await store.dispatch('OriginStore/addApp', {
-          appName: req.appName,
-          identityhash: identityhash,
-          origin: req.origin,
-          account_id: userResponse.result.id,
-          chain: userResponse.result.chain,
-          secret: ed.utils.bytesToHex(secret),
-          next_hash: req.payload.next_hash
-      });
-    } catch (error) {
-      return rejectRequest(req, error);
+    if (req.type == 'link') {
+        let hashContents = `${req.browser} ${req.origin} ${req.appName} ${userResponse.result.chain} ${userResponse.result.id}`;
+        try {
+          identityhash = sha256(hashContents).toString();
+        } catch (error) {
+          return rejectRequest(req, error);
+        }
+
+        let tempSecret;
+        try {
+            tempSecret = await ed.getSharedSecret(req.key, req.payload.pubkey);
+        } catch (error) {
+            return rejectRequest(req, error);
+        }
+        let secret = ed.utils.bytesToHex(tempSecret)
+
+        try {
+            app = await store.dispatch('OriginStore/addApp', {
+                appName: req.appName,
+                identityhash: identityhash,
+                origin: req.origin,
+                account_id: userResponse.result.id,
+                chain: userResponse.result.chain,
+                secret: secret,
+                next_hash: req.payload.next_hash
+            });
+          } catch (error) {
+            return rejectRequest(req, error);
+          }
+    } else {
+        identityhash = userResponse.result.identityhash
+        app = store.getters['OriginStore/getBeetApp']({payload: {identityhash: identityhash}});
     }
 
     // todo: why copy content of request?
@@ -254,6 +261,7 @@ export default class BeetServer {
 
       let blockchainActions = [
         Actions.SIGN_MESSAGE,
+        Actions.SIGN_NFT,
         Actions.VERIFY_MESSAGE,
         Actions.TRANSFER,
         Actions.VOTE_FOR,
@@ -284,6 +292,8 @@ export default class BeetServer {
           status = await voteFor(apiobj, blockchain);
         } else if (apiobj.type === Actions.SIGN_MESSAGE) {
           status = await signMessage(apiobj, blockchain);
+        } else if (apiobj.type === Actions.SIGN_NFT) {
+          status = await signNFT(apiobj, blockchain);
         } else if (apiobj.type === Actions.VERIFY_MESSAGE) {
           status = await messageVerification(apiobj, blockchain);
         } else if (apiobj.type === Actions.TRANSFER) {
@@ -349,7 +359,7 @@ export default class BeetServer {
             origin: socket.origin,
             appName: socket.appName,
             browser: socket.browser,
-            key: socket.keypair,
+            key: socket.keypair ?? null,
             type: linkType
         });
       } catch (error) {
@@ -367,7 +377,7 @@ export default class BeetServer {
 
       if (status.isLinked == true) {
           // link has successfully established
-          _establishLink(socket, status);
+          await _establishLink(socket, status);
       }
 
       socket.emit("link", _getLinkResponse(status));
@@ -375,22 +385,118 @@ export default class BeetServer {
     }
 
     /**
-     * @parameter {Vue} vue
-     * @parameter {number} port
-     * @returns {BeetServer}
+     * Fetch/store SSL certs. Return HTTPS or HTTP instance.
+     * @param {Number} httpsPort
+     * @param {Number} httpPort
+     * @returns {Object} server instances
      */
-    static async initialize(vue, port) {
-        const httpServer = createServer();
+    static async _getServer(httpsPort, httpPort) {
+        return new Promise(async (resolve, reject) => {
+            const httpServer = http.createServer()
+                                    .listen(httpPort, () => {
+                                        console.log(`HTTP server listening on port: ${httpPort}`);
+                                    });
+
+            let db = BeetDB.ssl_data;
+            let ssl;
+            try {
+                ssl = await db.toArray();
+            } catch (error) {
+                console.log(error);                
+            }
+
+            if (ssl && ssl.length > 0) {
+                let httpsServer;
+                try {
+                    httpsServer = https.createServer({
+                                        key: ssl[0].key,
+                                        cert: ssl[0].cert,
+                                        rejectUnauthorized: false
+                                    })
+                                    .listen(httpsPort, () => {
+                                        console.log(`HTTPS server listening on port: ${httpsPort}`);
+                                    });
+                } catch (error) {
+                    console.log(error);
+                }
+
+                if (httpsServer) {
+                    return resolve({http: httpServer, https: httpsServer});
+                }
+            }
+
+            let key;
+            try {
+                key = await fetch('https://raw.githubusercontent.com/beetapp/beet-certs/master/beet.key')
+                            .then(res => res.text());
+            } catch (error) {
+                console.log(error);
+            }
+
+            let cert;
+            try {
+                cert = await fetch('https://raw.githubusercontent.com/beetapp/beet-certs/master/beet.cert')
+                             .then(res => res.text());
+            } catch (error) {
+                console.log(error);
+            }
+
+            if (!key || !cert) {
+                return resolve({http: httpServer});
+            }
+
+            db.toArray().then((res) => {
+                if (res.length == 0) {
+                    db.add({key: key, cert: cert});
+                } else {
+                    db.update(res[0].id, {key: key, cert: cert});
+                }
+            });
+
+            let httpsServer;
+            try {
+                httpsServer = https.createServer({
+                                    key: key,
+                                    cert: cert,
+                                    rejectUnauthorized: false
+                                })
+                                .listen(httpsPort, ()=>{
+                                    console.log(`HTTPS server listening on port: ${httpsPort}`);
+                                });
+            } catch (error) {
+                console.log(error);
+                return resolve({http: httpServer});
+            } 
+
+            return resolve({http: httpServer, https: httpsServer});
+        });   
+    }
+
+    /**
+     * Use a http|https server to create a new socketio server instance 
+     * @param {Server} chosenServer 
+     */
+    static async newSocket(chosenServer) {
         const io = new Server(
-          httpServer,
-          {cors: {origin: "*", methods: ["GET", "POST"]}}
+            chosenServer,
+            {cors: {origin: "*", methods: ["GET", "POST"]}}
         );
+
+        io.on("connection_error", (error) => {
+            console.log(`io connection_error: ${error}`);
+            io.close();
+        });
 
         io.on("connection", async (socket) => {
           socket.isAuthenticated = false;
 
           socket.on("ping", (data) => {
-            socket.emit("pong", data);
+            socket.emit("pong", chosenServer.cert ? 'HTTPS' : 'HTTP');
+          });
+
+          socket.on("connection_error", (error) => {
+            console.log(`socket connection_error: ${error}`)
+            socket.disconnect();
           });
 
           /*
@@ -399,11 +505,10 @@ export default class BeetServer {
           socket.on("authenticate", async (data) => {
             logger.debug("incoming authenticate request", data);
             if (!store.state.WalletStore.isUnlocked) {
-              console.log(`locked wallet: ${store.state.WalletStore.isUnlocked}`)
               socket.emit("api", {id: data.id, error: true, payload: {code: 7, message: "Beet wallet authentication error."}});
               return;
             }
-
+           
             let status;
             try {
               status = await authHandler({
@@ -439,8 +544,8 @@ export default class BeetServer {
             socket.appName = status.appName;
             socket.browser = status.browser;
 
-            if (status.link == true) {
-              _establishLink(socket.id, status);
+            if (status.link == true) { 
+              await _establishLink(socket, status);
               let linkResponse = _getLinkResponse(status);
               console.log("Existing link");
               socket.emit('authenticated', linkResponse);
@@ -525,12 +630,10 @@ export default class BeetServer {
               return;
             }
 
-            //logger.debug("processing api request");
-
             try {
               await this.respondAPI(socket, data);
             } catch (error) {
-              //console.log(error);
+              console.log(error);
               if (socket) {
                 socket.emit("api", {id: data.id, error: true, payload: {code: 7, message: "API request unsuccessful."}});
               }
@@ -538,9 +641,25 @@ export default class BeetServer {
           });
 
         });
-        httpServer.listen(port);
+    }
 
-        console.info("WebSocket server listening on port ", port);
+    /**
+     * @parameter {number} httpPort
+     * @parameter {number} httpsPort
+     * @returns {BeetServer}
+     */
+    static async initialize(httpPort, httpsPort) {
+        let servers = await this._getServer(60554, 60555);
+        
+        let httpsSocket;
+        if (servers.https) {
+            httpsSocket = await this.newSocket(servers.https);
+        }
+
+        let httpSocket;
+        if (servers.http) { 
+            httpSocket = await this.newSocket(servers.http);
+        }
     }
 
 }

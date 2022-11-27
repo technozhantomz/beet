@@ -1,9 +1,12 @@
 <script setup>
     import { ipcRenderer } from 'electron';
-    import { computed } from "vue";
+    import { computed, onMounted } from "vue";
     import { useI18n } from 'vue-i18n';
-    const { t } = useI18n({ useScope: 'global' });
     import {formatChain} from "../../lib/formatter";
+    import RendererLogger from "../../lib/RendererLogger";
+
+    const { t } = useI18n({ useScope: 'global' });
+    const logger = new RendererLogger();
 
     const props = defineProps({
         request: {
@@ -21,7 +24,7 @@
             }
         },
         visualizedParams: {
-            type: String, // md5
+            type: String,
             required: true,
             default() {
                 return ''
@@ -29,18 +32,11 @@
         }
     });
 
-    let visualizedAccount = computed(() => {
-        if (!props.visualizedAccount) {
-            return '';
-        }
-        return atob(props.visualizedAccount);
-    });
-
     let visualizedParams = computed(() => {
         if (!props.visualizedParams) {
             return '';
         }
-        return atob(props.visualizedParams);
+        return props.visualizedParams;
     });
 
     let tableTooltip = computed(() => {
@@ -54,7 +50,7 @@
                 appName: props.request.payload.appName,
                 origin: props.request.payload.origin,
                 chain: formatChain(props.request.payload.chain),
-                accountName: props.request.payload.account_id
+                accountName: props.visualizedAccount ? props.visualizedAccount : props.request.payload.account_id
             }
         );
     });
@@ -70,6 +66,11 @@
             ? t('operations.rawsig.sign_btn')
             : t('operations.rawsig.sign_and_broadcast_btn')
     })
+
+    onMounted(() => {
+        logger.debug("Transaction request popup initialised");
+        console.log({visualizedParams})
+    });
 
     function _clickedAllow() {
         ipcRenderer.send(
@@ -94,66 +95,31 @@
 
 </script>
 <template>
-    <table
-        v-tooltip="tableTooltip"
-        class="table small table-striped table-sm"
-    >
-        <tbody>
-            <tr>
-                <td class="text-left">
-                    Origin:
-                </td>
-                <td class="text-right">
-                    {{ props.request.payload.origin }}
-                </td>
-            </tr>
-            <tr>
-                <td class="text-left">
-                    App:
-                </td>
-                <td class="text-right">
-                    {{ props.request.payload.appName }}
-                </td>
-            </tr>
-            <tr>
-                <td class="text-left">
-                    Account:
-                </td>
-                <td class="text-right">
-                    {{ formatChain(props.request.payload.chain) + ":" + (visualizedAccount) }}
-                </td>
-            </tr>
-            <tr>
-                <td class="text-left">
-                    Action:
-                </td>
-                <td class="text-right">
-                    {{ buttonText }}
-                </td>
-            </tr>
-        </tbody>
-    </table>
-
+    <div style="padding-bottom:5px;">
+        {{ tableTooltip }}
+    </div>
     <div
         v-if="!!visualizedParams"
         class="text-left custom-content"
     >
-        <h4 class="h4 beet-typo-small">
-            {{ t('operations.general.content') }}
-        </h4>
-        <pre class="text-left custom-content">
-        <code>
-          {{ visualizedParams }}
-        </code>
-      </pre>
+        {{ t('operations.general.content') }}
+        <ul>
+            <li
+                v-for="param in visualizedParams.split(/\r?\n/)"
+                :key="param"
+                style="list-style-type: none"
+            >
+                {{ param }}
+            </li>
+        </ul>
     </div>
     <div
         v-else
         class="text-left custom-content"
     >
         <pre>
-        Loading transaction details from blockchain, please wait.
-      </pre>
+                Loading transaction details from blockchain, please wait.
+            </pre>
     </div>
 
     <h4 class="h4 beet-typo-small">
@@ -163,6 +129,7 @@
     <span v-if="!!visualizedParams">
         <ui-button
             raised
+            style="margin-right:5px"
             @click="_clickedAllow()"
         >
             {{ buttonText }}
@@ -177,6 +144,7 @@
     <span v-else>
         <ui-button
             raised
+            style="margin-right:5px"
             disabled
         >
             {{ buttonText }}
@@ -187,5 +155,6 @@
         >
             {{ t('operations.rawsig.reject_btn') }}
         </ui-button>
+        <langSelect location="prompt" />
     </span>
 </template>

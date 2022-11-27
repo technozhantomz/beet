@@ -2,8 +2,11 @@
     import { ipcRenderer } from 'electron';
     import { onMounted, computed } from "vue";
     import { useI18n } from 'vue-i18n';
-    const { t } = useI18n({ useScope: 'global' });
+
+    import langSelect from "../lang-select.vue";
     import RendererLogger from "../../lib/RendererLogger";
+
+    const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
 
     const props = defineProps({
@@ -89,19 +92,23 @@
 </script>
 
 <template>
-    <div v-tooltip="t('operations.identity.request_tooltip')">
-        {{ requestText }} &#10068;
+    <div style="padding:5px">
+        <div v-tooltip="t('operations.identity.request_tooltip')">
+            {{ requestText }} &#10068;
+        </div>
+        <ui-button
+            raised
+            style="margin-right:5px"
+            @click="_clickedAllow()"
+        >
+            {{ t('operations.account_id.accept_btn') }}
+        </ui-button>
+        <ui-button
+            raised
+            @click="_clickedDeny()"
+        >
+            {{ t('operations.account_id.reject_btn') }}
+        </ui-button>
+        <langSelect location="prompt" />
     </div>
-    <ui-button
-        raised
-        @click="_clickedAllow()"
-    >
-        {{ t('operations.account_id.accept_btn') }}
-    </ui-button>
-    <ui-button
-        raised
-        @click="_clickedDeny()"
-    >
-        {{ t('operations.account_id.reject_btn') }}
-    </ui-button>
 </template>

@@ -105,7 +105,6 @@
     watch(selectedChain, async (newVal, oldVal) => {
         if (newVal !== oldVal) {
             selectedImport.value = 0;
-            selectedNode.value = 0;
         }
     }, {immediate: true});
 
@@ -137,16 +136,18 @@
      * Second step of account wizard
      */
     function step2() {
-        if (userHasWallet.value) {
+
+        if (userHasWallet.value == true && createNewWallet.value == false) { // add to logged in wallet
+            console.log('adding to existing wallet')
             step.value = 2;
             let fetchedName;
             try {
-                fetchedName = store.getters['WalletStore/getWallet'];
+                fetchedName = store.getters['WalletStore/getWalletName'];
             } catch (error) {
                 console.log(error);
                 return;
             }
-            walletname.value = fetchedName.walletname;
+            walletname.value = fetchedName;
             return;
         }
 
@@ -156,20 +157,15 @@
             return;
         }
 
-        // todo use WalletStore
-        let wallets = JSON.parse(localStorage.getItem("wallets"));
-        if (
-            wallets &&
-            wallets.filter(wallet => wallet.name === walletname.value.trim())
-                .length > 0
-        ) {
+        let walletList = store.getters['WalletStore/getWalletList'];
+        if (walletList.map(wallet => wallet.name).includes(walletname.value.trim())) {
             ipcRenderer.send("notify", t("common.duplicate_wallet_error"));
             s1c.value = "is-invalid";
             return;
-        } else {
-            walletname.value = walletname.value.trim();
-            step.value = 2;
         }
+
+        walletname.value = walletname.value.trim();
+        step.value = 2;
     }
 
     /*
@@ -196,16 +192,19 @@
             return;
         }
 
-        if (!userHasWallet.value) {
-            if (password.value == "" || password.value !== confirmPassword.value) {
-                ipcRenderer.send("notify", t(`common.confirm_pass_error`));
-                return;
-            }
+        if (password.value == "") {
+            ipcRenderer.send("notify", t(`common.confirm_pass_error`));
+            return;
+        }
+
+        if ((!userHasWallet.value || createNewWallet.value) && password.value !== confirmPassword.value) {
+            ipcRenderer.send("notify", t(`common.confirm_pass_error`));
+            return;
         }
 
         for (let i in accounts_to_import.value) {
             let account = accounts_to_import.value[i];
-            if (i == 0 && !userHasWallet.value) {
+            if (!userHasWallet.value || createNewWallet.value) {
                 try {
                     await store.dispatch("WalletStore/saveWallet", {
                         walletname: walletname.value,
@@ -217,8 +216,9 @@
                     _handleError(error);
                 }
             } else {
-                account.password = password;
+                account.password = password.value;
                 account.walletname = walletname.value;
+
                 try {
                     await store.dispatch("AccountStore/addAccount", account);
                 } catch (error) {
@@ -242,7 +242,7 @@
                 v-if="step == 1"
                 id="step1"
             >
-                <template v-if="!userHasWallet">
+                <template v-if="createNewWallet">
                     <p
                         v-tooltip="t('common.tooltip_friendly_cta')"
                         class="my-3 font-weight-bold"
@@ -331,7 +331,7 @@
                             replace
                         >
                             <ui-button
-                                outlined
+                                raised
                                 class="step_btn"
                             >
                                 {{ t('common.cancel_btn') }}
@@ -339,7 +339,7 @@
                         </router-link>
 
                         <span v-if="selectedImportOptions.length > 1">
-                            <span v-if="selectedImport != 0 && selectedNode !== 0">
+                            <span v-if="selectedImport != 0">
                                 <ui-button
                                     raised
                                     class="step_btn"
@@ -430,7 +430,7 @@
                         v-tooltip="t('common.tooltip_password_cta')"
                         class="mb-2 font-weight-bold"
                     >
-                        <span v-if="!userHasWallet">
+                        <span v-if="createNewWallet">
                             {{ t('common.password_cta') }} &#10068;
                         </span>
                         <span v-else>
@@ -445,7 +445,7 @@
                         :placeholder="t('common.password_placeholder')"
                         required
                     >
-                    <template v-if="!userHasWallet">
+                    <template v-if="createNewWallet">
                         <p class="mb-2 font-weight-bold">
                             {{ t('common.confirm_cta') }}
                         </p>

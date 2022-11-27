@@ -1,5 +1,6 @@
 import aes from "crypto-js/aes.js";
 import RendererLogger from "../../lib/RendererLogger";
+import sha512 from "crypto-js/sha512.js";
 
 const logger = new RendererLogger();
 const LOAD_ACCOUNTS = 'LOAD_ACCOUNTS';
@@ -32,25 +33,27 @@ const actions = {
         state
     }, payload) {
         return new Promise((resolve, reject) => {
-            let index = -1;
-            for (let i = 0; i < state.accountlist.length; i++) {
-                if (payload.account.chain == state.accountlist[i].chain && payload.account.accountID == state.accountlist[i].accountID) {
-                    reject('Account already exists');
+            let existingAccount = state.accountlist.find(x => x.chain == payload.account.chain && x.accountID == payload.account.accountID)
+
+            if (!existingAccount) {
+                for (let keytype in payload.account.keys) {
+                    payload.account.keys[keytype] = aes.encrypt(
+                        payload.account.keys[keytype],
+                        sha512(payload.password).toString()
+                    ).toString();
                 }
-            }
 
-            for (let keytype in payload.account.keys) {
-                payload.account.keys[keytype] = aes.encrypt(payload.account.keys[keytype], payload.password).toString();
+                dispatch('WalletStore/saveAccountToWallet', payload, {root: true})
+                .then(() => {
+                    commit(ADD_ACCOUNT, payload.account);
+                    return resolve('Account added');
+                }).catch((error) => {
+                    console.log(error)
+                    return reject(error);
+                });
+            } else {
+                return reject('Account already exists');
             }
-
-            dispatch('WalletStore/saveAccountToWallet', payload, {
-                root: true
-            }).then(() => {
-                commit(ADD_ACCOUNT, payload.account);
-                resolve('Account added');
-            }).catch((error) => {
-                reject(error);
-            });
         });
     },
     loadAccounts({
@@ -64,7 +67,6 @@ const actions = {
                 reject('Empty Account list');
             }
         });
-
     },
     logout({
         commit
@@ -97,6 +99,15 @@ const actions = {
 
 const getters = {
     getAccount: state => state.accountlist[state.selectedIndex],
+    getCurrentSafeAccount: state => () => {
+        let currentAccount = state.accountlist[state.selectedIndex];
+        return {
+            accountID: currentAccount.accountID,
+            accountName: currentAccount.accountName,
+            chain: currentAccount.chain
+        }
+    },
+    getCurrentIndex: state => state.selectedIndex ?? -1,
     getChain: state => state.accountlist[state.selectedIndex].chain,
     getAccountList: state => state.accountlist,
     getSafeAccountList: state => state.accountlist.map(account => {
@@ -111,7 +122,8 @@ const getters = {
           return {
             accountID: account.accountID,
             accountName: account.accountName,
-            chain: account.chain
+            chain: account.chain,
+            memoKey: account.keys.memo
           };
         });
 
@@ -127,6 +139,10 @@ const getters = {
         }
 
         return requestedAccounts[0];
+    },
+    getCurrentActiveKey: (state) => () => {
+        let currentAccount = state.accountlist[state.selectedIndex];
+        return currentAccount.keys.active;
     },
     getActiveKey: (state) => (request) => {
       let signing = state.accountlist.filter(account => {

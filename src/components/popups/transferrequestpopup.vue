@@ -1,8 +1,11 @@
 <script setup>
     import { ipcRenderer } from 'electron';
     import { onMounted, computed } from "vue";
-    import RendererLogger from "../../lib/RendererLogger";
     import { useI18n } from 'vue-i18n';
+
+    import RendererLogger from "../../lib/RendererLogger";
+    import langSelect from "../lang-select.vue";
+
     const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
 
@@ -28,9 +31,23 @@
                 return ''
             }
         },
+        target: {
+            type: String,
+            required: true,
+            default() {
+                return ''
+            }
+        },
         toSend: {
             type: String,
             required: true,
+            default() {
+                return ''
+            }
+        },
+        warning: {
+            type: String,
+            required: false,
             default() {
                 return ''
             }
@@ -45,7 +62,7 @@
             appName: props.request.payload.appName,
             origin: props.request.payload.origin,
             chain: props.chain,
-            accountName: atob(props.accountName)
+            accountName: props.accountName
         });
     });
 
@@ -54,6 +71,13 @@
             return '';
         }
         return props.request.payload.params.to;
+    });
+
+    let target = computed(() => {
+        if (!props.target) {
+            return '';
+        }
+        return props.target;
     });
 
     let satoshis = computed(() => {
@@ -74,7 +98,7 @@
         if (!props.toSend) {
             return '';
         }
-        return atob(props.toSend);
+        return props.toSend;
     });
 
     let toSendFee = computed(() => {
@@ -82,6 +106,20 @@
             return '';
         }
         return props.request.payload.params.toSendFee ?? null;
+    });
+
+    let memo = computed(() => {
+        if (!props.request) {
+            return '';
+        }
+        return props.request.payload.params.memo ?? null;
+    });
+
+    let warning = computed(() => {
+        if (!props.warning || !props.warning.length) {
+            return;
+        }
+        return props.warning;
     });
 
     let feeInSatoshis = computed(() => {
@@ -116,34 +154,57 @@
     }
 </script>
 <template>
-    {{ message }}
-    <br>
-    <br>
-    <pre class="text-left custom-content">
-      <span v-if="toSendFee">
-        <code>
-          Recipient: {{ to }}
-          Amount: {{ toSend }}
-          Fee: {{ toSendFee }}
-        </code>
-      </span>
-      <span v-else>
-        <code>
-          Recipient: {{ to }}
-          Amount: {{ toSend }}
-        </code>
-      </span>
-    </pre>
-    <ui-button
-        raised
-        @click="_clickedAllow()"
-    >
-        {{ t("operations.transfer.accept_btn") }}
-    </ui-button>
-    <ui-button
-        raised
-        @click="_clickedDeny()"
-    >
-        {{ t("operations.transfer.reject_btn") }}
-    </ui-button>
+    <div style="padding:5px">
+        <p>
+            {{ message }}
+        </p>
+        <ui-list>
+            <ui-item key="Recipient">
+                <ui-item-text-content>
+                    Recipient: {{ to }} ({{ target }})
+                </ui-item-text-content>
+            </ui-item>
+            <ui-item key="Amount">
+                <ui-item-text-content>
+                    Amount: {{ toSend }} ({{ asset_id }})
+                </ui-item-text-content>
+            </ui-item>
+            <ui-item v-if="memo" key="Memo">
+                <ui-item-text-content>
+                    Memo: {{ memo }}
+                </ui-item-text-content>
+            </ui-item>
+            <ui-item
+                v-if="toSendFee"
+                key="Fee"
+            >
+                <ui-item-text-content>
+                    Fee: {{ toSendFee }}
+                </ui-item-text-content>
+            </ui-item>
+        </ui-list>
+        
+        <ui-alert v-if="warning" state="warning">
+            {{
+                warning === "serverError"
+                    ? t("operations.transfer.server_error")
+                    : t("operations.transfer.detected_scammer")
+            }}
+        </ui-alert>
+
+        <ui-button
+            raised
+            style="margin-right:5px"
+            @click="_clickedAllow()"
+        >
+            {{ t("operations.transfer.accept_btn") }}
+        </ui-button>
+        <ui-button
+            raised
+            @click="_clickedDeny()"
+        >
+            {{ t("operations.transfer.reject_btn") }}
+        </ui-button>
+        <langSelect location="prompt" />
+    </div>
 </template>

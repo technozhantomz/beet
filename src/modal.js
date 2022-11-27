@@ -1,5 +1,6 @@
 import { createApp } from 'vue';
 import { createI18n } from 'vue-i18n';
+import mitt from 'mitt';
 
 import BalmUI from 'balm-ui'; // Official Google Material Components
 import BalmUIPlus from 'balm-ui/dist/balm-ui-plus'; // BalmJS Team Material Components
@@ -28,7 +29,10 @@ process.on('unhandledRejection', (reason, p) => {
   // application specific logging, throwing an error, or other logic here
 });
 
+const emitter = mitt();
 const app = createApp({});
+app.provide('emitter', emitter);
+
 app.config.errorHandler = function (err, vm, info) {
   logger.error(err, vm, info);
   console.log("error:" + err);
@@ -41,6 +45,14 @@ window.t = (key, params) => {
     return i18n.global.t(key, params)
 }
 
-app.use(BalmUI);
+app.use(BalmUI, {
+    $theme: {
+        primary: '#C7088E'
+    }
+});
 app.use(BalmUIPlus);
 app.mount('#modal');
+
+emitter.on('i18n', (data) => {
+    i18n.global.locale.value = data
+});  

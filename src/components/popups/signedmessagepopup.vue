@@ -2,8 +2,10 @@
     import { ipcRenderer } from 'electron';
     import { onMounted, computed } from "vue";
     import { useI18n } from 'vue-i18n';
-    const { t } = useI18n({ useScope: 'global' });
+    import langSelect from "../lang-select.vue";
     import RendererLogger from "../../lib/RendererLogger";
+
+    const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
 
     const props = defineProps({
@@ -23,6 +25,10 @@
         }
     });
 
+    let textFieldContents = computed(() => {
+        return JSON.stringify(JSON.parse(props.request.payload.params), undefined, 4)
+    });
+
     let requestText = computed(() => {
         if (!props.request || !props.accounts) {
             return '';
@@ -30,7 +36,7 @@
         return t("operations.message.request", {
             appName: props.request.payload.appName,
             origin: props.request.payload.origin,
-            chain: props.accounts[0].chain, // FIX
+            chain: props.accounts[0].chain,
             accountName: props.accounts[0].accountName
         });
     });
@@ -61,24 +67,29 @@
 </script>
 
 <template>
-    {{ requestText }}:
-    <br>
-    <br>
-    <pre class="text-left custom-content">
-      <code>
-        {{ props.request.payload.params }}
-      </code>
-    </pre>
-    <ui-button
-        raised
-        @click="_clickedAllow()"
-    >
-        {{ t("operations.message.accept_btn") }}
-    </ui-button>
-    <ui-button
-        raised
-        @click="_clickedDeny()"
-    >
-        {{ t("operations.message.reject_btn") }}
-    </ui-button>
+    <div style="padding:5px">
+        {{ requestText }}
+        <ui-textfield
+            v-model="textFieldContents"
+            input-type="textarea"
+            fullwidth
+            disabled
+            rows="5"
+        />
+        <br>
+        <ui-button
+            raised
+            style="margin-right:5px"
+            @click="_clickedAllow()"
+        >
+            {{ t("operations.message.accept_btn") }}
+        </ui-button>
+        <ui-button
+            raised
+            @click="_clickedDeny()"
+        >
+            {{ t("operations.message.reject_btn") }}
+        </ui-button>
+        <langSelect location="prompt" />
+    </div>
 </template>

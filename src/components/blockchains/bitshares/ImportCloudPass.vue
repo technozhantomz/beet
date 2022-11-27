@@ -1,11 +1,11 @@
 <script setup>
     import {ref, onMounted, inject} from "vue";
-    const emitter = inject('emitter');
-
     import { useI18n } from 'vue-i18n';
-    const { t } = useI18n({ useScope: 'global' });
     import {PrivateKey} from "bitsharesjs";
     import getBlockchainAPI from "../../../lib/blockchains/blockchainFactory";
+
+    const emitter = inject('emitter');
+    const { t } = useI18n({ useScope: 'global' });
 
     const props = defineProps({
         chain: {
@@ -16,7 +16,7 @@
     });
 
     onMounted(() => {
-        if (!["BTS", "TUSC"].includes(props.chain)) {
+        if (!["BTS", "BTS_TEST", "TUSC"].includes(props.chain)) {
             throw "Unsupported chain!";
         }
     })
@@ -25,11 +25,14 @@
     let bitshares_cloud_login_password = ref("");
     let legacy = ref(false);
 
-    function getAuthoritiesFromPass(legacy=false) {
+    let inProgress = ref();
+    let errorOcurred = ref();
+
+    function getAuthoritiesFromPass(legacyMode=false) {
         let active_seed = accountname.value + 'active' + bitshares_cloud_login_password.value;
         let owner_seed = accountname.value + 'owner' + bitshares_cloud_login_password.value;
         let memo_seed = accountname.value + 'memo' + bitshares_cloud_login_password.value;
-        return legacy
+        return legacyMode
             ? {
                 active: PrivateKey.fromSeed(active_seed).toWif(),
                 memo: PrivateKey.fromSeed(active_seed).toWif(), // legacy wallets improperly used active key for memo
@@ -47,11 +50,16 @@
     }
 
     async function next() {
+        inProgress.value = true;
+        errorOcurred.value = false;
+
         let blockchain;
         try {
             blockchain = getBlockchainAPI(props.chain);
         } catch (error) {
             console.log(error);
+            errorOcurred.value = true;
+            inProgress.value = false;
             return;
         }
 
@@ -61,6 +69,8 @@
             authorities = getAuthoritiesFromPass(legacy.value);
         } catch (error) {
             console.log(error);
+            errorOcurred.value = true;
+            inProgress.value = false;
             return;
         }
 
@@ -69,10 +79,13 @@
             account = await blockchain.verifyAccount(accountname.value, authorities);
         } catch (error) {
             console.log(error);
+            errorOcurred.value = true;
+            inProgress.value = false;
             return;
         }
 
         if (account) {
+            inProgress.value = false;
             emitter.emit('accounts_to_import', [{
                 account: {
                     accountName: accountname.value,
@@ -124,9 +137,8 @@
                 >
                     {{ t('common.back_btn') }}
                 </ui-button>
-
                 <ui-button
-                    v-if="accountname !== '' && bitshares_cloud_login_password !== ''"
+                    v-if="accountname !== '' && bitshares_cloud_login_password !== '' && !inProgress && !errorOcurred"
                     raised
                     class="step_btn"
                     type="submit"
@@ -134,8 +146,27 @@
                 >
                     {{ t('common.next_btn') }}
                 </ui-button>
+                <span v-if="accountname !== '' && bitshares_cloud_login_password !== '' && errorOcurred">
+                    <ui-button
+                        raised
+                        class="step_btn"
+                        type="submit"
+                        @click="next"
+                    >
+                        {{ t('common.next2_btn') }}
+                    </ui-button>
+                    <br>
+                    <ui-alert state="warning">
+                        {{ t('common.error_text') }}
+                    </ui-alert>
+                </span>
+                <figure v-if="accountname !== '' && bitshares_cloud_login_password !== '' && inProgress">
+                    <ui-progress indeterminate />
+                    <br>
+                    <figcaption>Connecting to blockchain</figcaption>
+                </figure>
                 <ui-button
-                    v-else
+                    v-if="accountname === '' || bitshares_cloud_login_password === ''"
                     disabled
                     class="step_btn"
                     type="submit"

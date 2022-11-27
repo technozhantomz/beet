@@ -1,9 +1,66 @@
 {
-    "appName": "HomePesa",
-    "slogan": "Cardless borderless Payment solution",
-    "welcome": "Borderless blockchain Merchants",
-    "no_wallet": "There is no Homepesa Wallet available.",
-    "start_cta": "Create new Homepesa Wallet",
+    "totp": {
+        "label": "Time-based one-time passwords",
+        "prompt": "Select your required operations below",
+        "chosen": "operations chosen",
+        "request": "Request passcode",
+        "default": "Insufficient operations",
+        "time": "Time remaining",
+        "exit": "Exit TOTP page",
+        "save": "Save",
+        "unsupported": "TOTP is not yet supported for this chain, sorry.",
+        "warning": "Do not share the code above with anyone",
+        "inProgress": "A deeplink is being processed"
+    },
+    "qr": {
+        "label": "QR Code scanner",
+        "main": {
+            "title": "QR Scanner methods",
+            "scan": "Scan a QR code",
+            "drag": "Drag & drop a QR image",
+            "upload": "Upload a QR image"
+        },
+        "scan": {
+            "title": "Scan a QR code with your webcam"
+        },
+        "drag": {
+            "title": "Drag and drop an image containing a QR code"
+        }, 
+        "upload": {
+            "title": "Upload an image file to scan for QR codes"
+        },
+        "exit": "Exit QR page",
+        "back": "Back",
+        "progress": "Processing QR code",
+        "unsupported": "QR codes are not yet supported for this chain, sorry.",
+        "promptSuccess": "Successfully broadcast QR scanned operation",
+        "promptFailure": "Something went wrong with the scanned QR"
+    },
+    "actionBar": {
+        "Home": "Home",
+        "New": "New",
+        "TOTP": "TOTP",
+        "QR": "QR",
+        "Settings": "Settings",
+        "Backup": "Backup",
+        "dapps": "DAAPs",
+        "Logout": "Logout"
+    },
+    "popup": {
+        "preview": "Prompt preview",
+        "request": "View request JSON",
+        "payload": "View payload JSON",
+        "language": "Language"
+    },
+    "abHome": "Home",
+    "abNew": "New",
+    "abSettings": "Settings",
+    "abLogout": "Logout",
+    "appName": "beet",
+    "slogan": "Your blockchain companion",
+    "welcome": "Welcome to Beet!",
+    "no_wallet": "There is no Beet Wallet available.",
+    "start_cta": "Create new Beet Wallet",
     "select_wallet": "Select Wallet:",
     "password_placeholder": "Password",
     "invalid_password": "Password is incorrect. Please try again.",
@@ -16,10 +73,10 @@
     "step_counter": "Step {step_no}",
     "friendly_cta": "Set a friendly name for your new wallet:",
     "tooltip_friendly_cta": "Under this name a new encrypted digital wallet will be stored locally on your computer. It will contain the private keys of all accounts that you add to it. One wallet can contain multiple blockchains.",
-    "backupfile_cta": "Please select a Homepesa Wallet Backup",
-    "tooltip_backupfile_cta": "Choose a previously backed up Homepesa Wallet (.beet file) that contains your keys and account details to recreate that wallet.",
+    "backupfile_cta": "Please select a Beet Wallet Backup",
+    "tooltip_backupfile_cta": "Choose a previously backed up Beet Wallet (.beet file) that contains your keys and account details to recreate that wallet.",
     "backuppass_cta": "Enter your backup password",
-    "tooltip_backuppass_cta": "Enter the password for the backed up wallet. This will allow Homepesa to decrypt and restore it. The same password will be used to unlock the wallet from now on.",
+    "tooltip_backuppass_cta": "Enter the password for the backed up wallet. This will allow Beet to decrypt and restore it. The same password will be used to unlock the wallet from now on.",
     "restore_go_cta": "Restore my wallet",
     "chain_cta": "Select the blockchain of your account:",
     "bts_importtype_cta": "Please select the way you would like to import this account",
@@ -39,8 +96,10 @@
     "select_chain": "Select Chain:",
     "cancel_btn": "Cancel",
     "next_btn": "Next",
+    "error_text": "An error occurred, check your password and try again.",
     "import_btn": "Import selected",
     "back_btn": "Back",
+    "next2_btn": "Try again",
     "account": "Account:",
     "account_name": "{chain} Account Name",
     "address_name": "{chain} Address",
@@ -77,8 +136,9 @@
     "settings_lbl": "Settings",
     "error_lbl": "Error",
     "node_lbl": "Node:",
-    "link_alert": "App: `{appName}` from `{origin}` wants to link to a {chain} chain.",
-    "access_alert": "App: `{appName}` from `{origin}` wants to interact with linked account {chain}:{account_id}.",
+    "link_alert": "App: '{appName}' from '{origin}' wants to link to a {chain} chain.",
+    "relink_alert": "App: '{appName}' from '{origin}' wants to relink to a {chain} chain.",
+    "access_alert": "App: '{appName}' from '{origin}' wants to interact with linked account {chain}:{account_id}.",
     "dapps_lbl": "Your linked dApps",
     "appname_lbl": "App Name",
     "origin_lbl": "Host/Domain",
@@ -89,7 +149,7 @@
     "delete_btn": "Remove",
     "backup_lbl": "Backup your Beet",
     "backup_btn": "Download Backup",
-    "backup_txt": "Click the 'Download Backup' button below to save an encrypted file with all your Homepesa Wallet keys. The backup file will be encrypted with your Homepesa Wallet password and you will need your password to import the backup to a new Homepesa installation.",
+    "backup_txt": "Click the 'Download Backup' button below to save an encrypted file with all your Beet Wallet keys. The backup file will be encrypted with your Beet Wallet password and you will need your password to import the backup to a new Beet installation.",
     "tooltip_lock": "Click to lock this wallet / logout and return to the wallet selection screen.",
     "tooltip_refresh": "Reconnect to the blockchain and refresh the account balance"
 }

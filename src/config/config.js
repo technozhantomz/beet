@@ -1,7 +1,7 @@
 let _blockchains = {
     BTS: {
         coreSymbol: 'BTS',
-        name: 'Homepesa',
+        name: 'BitShares',
         chainId: '4018d7844c78f6a6c41c6a552b898022310fc5dec06da467ee7905a8dad512c8',
         nodeList: [
             {
@@ -26,8 +26,8 @@ let _blockchains = {
                 url: "wss://btsws.roelandp.nl/ws"
             }
         ]
-    }
-    /*BTS_TEST: {
+    },
+    BTS_TEST: {
         coreSymbol: 'TEST',
         name: 'BitShares',
         testnet: true,
@@ -92,8 +92,8 @@ let _blockchains = {
                 contact: "https://www.blockchain.com"
             }
         ]
-    },
-    STEEM: {
+    }
+    /*STEEM: {
         coreSymbol: 'STM',
         name: 'Steem',
         chainId: '0',

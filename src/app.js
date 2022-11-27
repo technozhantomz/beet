@@ -5,7 +5,6 @@ import mitt from 'mitt';
 
 import BalmUI from 'balm-ui'; // Official Google Material Components
 import BalmUIPlus from 'balm-ui/dist/balm-ui-plus'; // BalmJS Team Material Components
-import BalmUINext from 'balm-ui/dist/balm-ui-next';
 import 'balm-ui-css';
 
 import router from './router/index.js';
@@ -17,7 +16,6 @@ import {i18n} from './lib/i18n.js';
 import 'typeface-roboto';
 import 'typeface-rajdhani';
 
-//import './css/style.css';
 import './scss/beet.scss';
 
 const logger = new RendererLogger;
@@ -52,23 +50,20 @@ window.t = (key, params) => {
 }
 
 app.use(VueRouter);
-app.use(BalmUI);
-app.use(BalmUIPlus);
-app.use(BalmUINext, {
-  // Optional. Overwrite `<ui-navigation-bar>` props with default value.
-  UiNavigationBar: {
-    // some props
-  }
+app.use(BalmUI, {
+    $theme: {
+        primary: '#C7088E',
+        secondary: '#960069'
+    }
 });
+app.use(BalmUIPlus);
 
 app.use(router);
 app.use(store);
 app.mount('#app');
 
-BeetServer.initialize(app, 60555);
+BeetServer.initialize(60554, 60555);
 
 emitter.on('i18n', (data) => {
-  console.log(data)
-  i18n.global.locale = data;
-  console.log(i18n.global.locale)
+  i18n.global.locale.value = data
 });

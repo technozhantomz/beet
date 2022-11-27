@@ -4,6 +4,8 @@
     import RendererLogger from "../../lib/RendererLogger";
     import {formatChain, formatAccount} from "../../lib/formatter";
 
+    import langSelect from "../lang-select.vue";
+
     import { useI18n } from 'vue-i18n';
     const { t } = useI18n({ useScope: 'global' });
     const logger = new RendererLogger();
@@ -59,11 +61,6 @@
         if (!props.accounts || !props.accounts.length) {
             return [];
         }
-        
-        let filteredAccounts = props.accounts.filter(account => props.request.chain === account.chain);
-        if (!filteredAccounts.length) {
-            return [];
-        }
 
         return props.accounts.map((account, i) => {
             return {
@@ -109,7 +106,7 @@
 </script>
 
 <template>
-    <div>
+    <div style="padding:5px">
         <div v-tooltip="t('operations.link.request_tooltip')">
             {{ requestText }}
         </div>
@@ -148,7 +145,10 @@
         </div>
         <br>
         <div v-if="chosenAccount == -1">
-            <ui-button disabled>
+            <ui-button
+                style="margin-right:5px"
+                disabled
+            >
                 {{ t('operations.link.accept_btn') }}
             </ui-button>
             <ui-button
@@ -157,10 +157,12 @@
             >
                 {{ t('operations.link.reject_btn') }}
             </ui-button>
+            <langSelect location="prompt" />
         </div>
         <div v-else>
             <ui-button
                 raised
+                style="margin-right:5px"
                 @click="_clickedAllow()"
             >
                 {{ t('operations.link.accept_btn') }}
@@ -171,6 +173,7 @@
             >
                 {{ t('operations.link.reject_btn') }}
             </ui-button>
+            <langSelect location="prompt" />
         </div>
     </div>
 </template>

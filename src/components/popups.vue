@@ -1,6 +1,7 @@
 <script setup>
     import { computed } from "vue";
     import queryString from "query-string";
+    import { useI18n } from 'vue-i18n';
 
     import * as Actions from '../lib/Actions';
 
@@ -11,6 +12,9 @@
     import SignMessageRequestPopup from "./popups/signedmessagepopup";
     import TransactionRequestPopup from "./popups/transactionrequestpopup";
     import TransferRequestPopup from "./popups/transferrequestpopup";
+    import langSelect from "./lang-select.vue";
+
+    const { t } = useI18n({ useScope: 'global' });
 
     function handleProp(target) {
         if (!global || !global.location || !global.location.search) {
@@ -22,11 +26,16 @@
             qs = queryString.parse(global.location.search);
         } catch (error) {
             console.log(error);
+            return;
         }
 
-        return qs && qs[target]
-            ? qs[target]
-            : '';
+        if (!qs[target]) {
+            return;
+        }
+
+        let qsTarget = qs[target];
+        let decoded = decodeURIComponent(qsTarget);
+        return decoded;
     }
 
     let type = computed(() => {
@@ -45,6 +54,15 @@
         return handleProp('accountName');
     });
 
+    let target = computed(() => {
+        return handleProp('target');
+    });
+
+    let warning = computed(() => {
+        let thisWarning = handleProp('warning');
+        return thisWarning
+    });
+
     let visualizedAccount = computed(() => {
         return handleProp('visualizedAccount');
     });
@@ -54,63 +72,134 @@
     });
 
     let request = computed(() => {
-        return JSON.parse(handleProp('request'));
+        let req = handleProp('request');
+        return req ? JSON.parse(req) : null;
+    });
+
+    let moreRequest = computed(() => {
+        let req = handleProp('request');
+        return req ? JSON.stringify(JSON.parse(req), undefined, 4) : null;
     });
 
     let payload = computed(() => {
-        return JSON.parse(handleProp('payload'));
-    })
+        let req = handleProp('payload');
+        return req ? JSON.parse(req) : null;
+    });
 
     let accounts = computed(() => {
-        return JSON.parse(handleProp('accounts'));
+        let req = handleProp('accounts');
+        let parsedReq = req ? JSON.parse(req) : null;
+
+        let request = handleProp('request')
+        let parsedRequest = request ? JSON.parse(request) : null;
+
+        let filteredAccounts = parsedReq.filter(account => parsedRequest.payload.chain === account.chain);
+        return filteredAccounts;
     });
 
     let existingLinks = computed(() => {
-        return JSON.parse(handleProp('existingLinks'));
+        let req = handleProp('existingLinks');
+        return req ? JSON.parse(req) : null;
     });
 </script>
 
 <template>
     <div v-if="type && type !== '' && request">
-        <LinkRequestPopup
-            v-if="type === Actions.REQUEST_LINK"
-            :request="request"
-            :accounts="accounts"
-            :existing-links="existingLinks"
-        />
-        <ReLinkRequestPopup
-            v-else-if="type === Actions.REQUEST_RELINK"
-            :request="request"
-            :accounts="accounts"
-        />
-        <IdentityRequestPopup
-            v-else-if="type === Actions.GET_ACCOUNT"
-            :request="request"
-            :accounts="accounts"
-        />
-        <GenericRequestPopup
-            v-else-if="type === Actions.VOTE_FOR || type === Actions.VERIFY_MESSAGE"
-            :request="request"
-            :payload="payload"
-        />
-        <SignMessageRequestPopup
-            v-else-if="type === Actions.SIGN_MESSAGE"
-            :request="request"
-            :accounts="accounts"
-        />
-        <TransferRequestPopup
-            v-else-if="type === Actions.TRANSFER"
-            :request="request"
-            :chain="chain"
-            :account-name="accountName"
-            :to-send="toSend"
-        />
-        <TransactionRequestPopup
-            v-else-if="type === Actions.REQUEST_SIGNATURE || type === Actions.INJECTED_CALL"
-            :request="request"
-            :visualized-params="visualizedParams"
-            :visualized-account="visualizedAccount"
-        />
+        <ui-collapse
+            with-icon
+            ripple
+            model-value="{{True}}"
+        >
+            <template #toggle>
+                <div>{{ t('common.popup.preview') }}</div>
+            </template>
+            <LinkRequestPopup
+                v-if="type === Actions.REQUEST_LINK"
+                :request="request"
+                :accounts="accounts"
+                :existing-links="existingLinks"
+            />
+            <ReLinkRequestPopup
+                v-else-if="type === Actions.REQUEST_RELINK"
+                :request="request"
+                :accounts="accounts"
+            />
+            <IdentityRequestPopup
+                v-else-if="type === Actions.GET_ACCOUNT"
+                :request="request"
+                :accounts="accounts"
+            />
+            <GenericRequestPopup
+                v-else-if="type === Actions.VOTE_FOR"
+                :request="request"
+                :payload="payload"
+            />
+            <SignMessageRequestPopup
+                v-else-if="type === Actions.SIGN_MESSAGE || type === Actions.SIGN_NFT"
+                :request="request"
+                :accounts="accounts"
+            />
+            <TransferRequestPopup
+                v-else-if="type === Actions.TRANSFER"
+                :request="request"
+                :chain="chain"
+                :account-name="accountName"
+                :target="target"
+                :warning="warning"
+                :to-send="toSend"
+            />
+            <TransactionRequestPopup
+                v-else-if="type === Actions.REQUEST_SIGNATURE || type === Actions.INJECTED_CALL"
+                :request="request"
+                :visualized-params="visualizedParams"
+                :visualized-account="visualizedAccount"
+            />
+        </ui-collapse>
+        <ui-collapse
+            v-if="moreRequest"
+            with-icon
+            ripple
+        >
+            <template #toggle>
+                <div>{{ t('common.popup.request') }}</div>
+            </template>
+            <div>
+                <ui-textfield
+                    v-model="moreRequest"
+                    input-type="textarea"
+                    fullwidth
+                    disabled
+                    rows="8"
+                />
+            </div>
+        </ui-collapse>
+        <ui-collapse
+            v-if="payload"
+            with-icon
+            ripple
+        >
+            <template #toggle>
+                <div>{{ t('common.popup.payload') }}</div>
+            </template>
+            <div>
+                <ui-textfield
+                    v-model="payload"
+                    input-type="textarea"
+                    fullwidth
+                    disabled
+                    rows="8"
+                />
+            </div>
+        </ui-collapse>
+        <ui-collapse
+            with-icon
+            ripple
+        >
+            <template #toggle>
+                <div>{{ t('common.abSettings') }}</div>
+            </template>
+            <langSelect location="prompt" />
+        </ui-collapse>
     </div>
     <div v-else>
         Error: Unable to load prompt.

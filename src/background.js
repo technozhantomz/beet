@@ -5,6 +5,9 @@
 import path from "path";
 import url from "url";
 import fs from 'fs';
+import os from 'os';
+import { argv } from 'node:process';
+import queryString from "query-string";
 
 // Special module holding environment variables which you declared
 // in config/env_xxx.json file.
@@ -46,65 +49,103 @@ const createModal = async (arg, modalEvent) => {
     let modalHeight = 400;
     let modalWidth = 600;
     if (!mainWindow) {
+        logger.debug(`No window`);
         throw 'No main window';
     }
 
     let request = arg.request;
     let id = request.id;
+    if (!request || !request.id) {
+        logger.debug(`No request`);
+        throw 'No request';
+    }
+
     if (modalWindows[id] || modalRequests[id]) {
         throw 'Modal exists already!';
     }
 
     let type = request.type;
-    let accounts = arg.accounts;
-    let existingLinks = arg.existingLinks;
+    if (!type) {
+        throw 'No modal type'
+    }
 
     modalRequests[id] = {request: request, event: modalEvent};
 
     let targetURL = `file://${__dirname}/modal.html?`
-                    + `id=${id}`
-                    + `&type=${type}`
-                    + `&request=${JSON.stringify(request)}`;
+                    + `id=${encodeURIComponent(id)}`
+                    + `&type=${encodeURIComponent(type)}`
+                    + `&request=${encodeURIComponent(JSON.stringify(request))}`;
 
     if (type === Actions.REQUEST_LINK) {
-        modalRequests[id]['existingLinks'] = existingLinks;
-        targetURL += `&existingLinks=${JSON.stringify(existingLinks)}`;
+        let existingLinks = arg.existingLinks;
+        if (existingLinks) {
+            modalRequests[id]['existingLinks'] = existingLinks;
+            targetURL += `&existingLinks=${encodeURIComponent(JSON.stringify(existingLinks))}`;
+        }
     }
 
     if ([Actions.INJECTED_CALL, Actions.REQUEST_SIGNATURE].includes(type)) {
-      modalRequests[id]['visualizedAccount'] = arg.visualizedAccount;
-      modalRequests[id]['visualizedParams'] = arg.visualizedParams;
-      targetURL += `&visualizedAccount=${btoa(arg.visualizedAccount)}`;
-      targetURL += `&visualizedParams=${btoa(arg.visualizedParams)}`;
+      let visualizedAccount = arg.visualizedAccount;
+      let visualizedParams = arg.visualizedParams;
+      if (!visualizedAccount || !visualizedParams) {
+        throw 'Missing required visualized fields'
+      }
+      modalRequests[id]['visualizedAccount'] = visualizedAccount;
+      modalRequests[id]['visualizedParams'] = visualizedParams;
+      targetURL += `&visualizedAccount=${encodeURIComponent(visualizedAccount)}`;
+      targetURL += `&visualizedParams=${encodeURIComponent(visualizedParams)}`;
     }
 
-    if ([Actions.VOTE_FOR, Actions.VERIFY_MESSAGE].includes(type)) {
-      modalRequests[id]['payload'] = arg.payload;
-      targetURL += `&payload=${JSON.stringify(arg.payload)}`;
+    if ([Actions.VOTE_FOR].includes(type)) {
+      let payload = arg.payload;
+      if (!payload) {
+        throw 'Missing required payload field'
+      }
+      modalRequests[id]['payload'] = payload;
+      targetURL += `&payload=${encodeURIComponent(JSON.stringify(payload))}`;
     }
 
     if ([
       Actions.REQUEST_LINK,
       Actions.REQUEST_RELINK,
       Actions.GET_ACCOUNT,
-      Actions.SIGN_MESSAGE
+      Actions.SIGN_MESSAGE,
+      Actions.SIGN_NFT
     ].includes(type)) {
+      let accounts = arg.accounts;
+      if (!accounts) {
+        throw 'Missing required accounts field'
+      }
       modalRequests[id]['accounts'] = accounts;
-      targetURL += `&accounts=${JSON.stringify(accounts)}`;
+      targetURL += `&accounts=${encodeURIComponent(JSON.stringify(accounts))}`;
     }
 
     if ([Actions.TRANSFER].includes(type)) {
       let chain = arg.chain;
-      let accountName = arg.accountName;
       let toSend = arg.toSend;
+      let accountName = arg.accountName;
+
+      if (!chain || !accountName || !toSend) {
+        throw 'Missing required fields'
+      }
 
       modalRequests[id]['chain'] = chain;
-      modalRequests[id]['accountName'] = accountName;
       modalRequests[id]['toSend'] = toSend;
+      modalRequests[id]['accountName'] = accountName;
 
-      targetURL += `&chain=${chain}`;
-      targetURL += `&accountName=${btoa(accountName)}`;
-      targetURL += `&toSend=${btoa(toSend)}`;
+      let target = arg.target;
+      modalRequests[id]['target'] = target;
+
+      let isBlockedAccount = arg.isBlockedAccount;
+      if (isBlockedAccount) {
+        modalRequests[id]['warning'] = true;
+        targetURL += isBlockedAccount ? `&warning=blockedAccount` : `&warning=serverError`;
+      }
+
+      targetURL += `&chain=${encodeURIComponent(chain)}`;
+      targetURL += `&accountName=${encodeURIComponent(accountName)}`;
+      targetURL += `&target=${encodeURIComponent(target)}`;
+      targetURL += `&toSend=${encodeURIComponent(toSend)}`;
     }
 
     modalWindows[id] = new BrowserWindow({
@@ -206,8 +247,8 @@ ipcMain.on('modalError', (event, arg) => {
  * Creating the primary window, only runs once.
  */
 const createWindow = async () => {
-  let width = 600;
-  let height = 850;
+  let width = 480;
+  let height = 695;
   mainWindow = new BrowserWindow({
       width: width,
       height: height,
@@ -262,7 +303,11 @@ const createWindow = async () => {
    * Create modal popup & wait for user response
    */
   ipcMain.on('createPopup', async (event, arg) => {
-      await createModal(arg, event);
+      try {
+        await createModal(arg, event);
+      } catch (error) {
+        console.log(error);
+      }
   })
 
   ipcMain.on('notify', (event, arg) => {
@@ -270,7 +315,7 @@ const createWindow = async () => {
       const NOTIFICATION_TITLE = 'Beet wallet notification';
       const NOTIFICATION_BODY = arg == 'request' ? "Beet has received a new request." : arg;
 
-      if (process.platform === 'win32')
+      if (os.platform === 'win32')
       {
           app.setAppUserModelId(app.name);
       }
@@ -292,7 +337,7 @@ const createWindow = async () => {
       seed = null;
       const emitter = mitt();
       try {
-        emitter.emit('timeout', 'logout');
+        mainWindow.webContents.send('timeout', 'logout');
       } catch (error) {
         console.log(error);
       }
@@ -336,7 +381,6 @@ const createWindow = async () => {
 
   ipcMain.on('downloadBackup', async (event, arg) => {
     let walletName = arg.walletName;
-    //let accounts = JSON.parse(atob(arg.accounts));
     let accounts = JSON.parse(arg.accounts);
     let toLocalPath = path.resolve(
       app.getPath("desktop"),
@@ -419,26 +463,95 @@ const createWindow = async () => {
 
 app.disableHardwareAcceleration();
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', async () => {
-    createWindow();
-});
+let currentOS = os.platform();
+if (currentOS == 'win32') {
+    // windows specific steps
+    const gotTheLock = app.requestSingleInstanceLock()
 
-// Quit when all windows are closed.
-app.on('window-all-closed', () => {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-      app.quit();
-  }
-});
+    if (!gotTheLock) {
+        app.quit()
+    } else {
+        // Handle the protocol. In this case, we choose to show an Error Box.
+        app.on('second-instance', (event, args) => {
+            // Someone tried to run a second instance, we should focus our window.
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) mainWindow.restore()
+                mainWindow.focus()
+                
+                if (process.platform == 'win32' && args.length > 2) {
+                    let deeplinkingUrl = args[3].replace('beet://api/', '');
 
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-      createWindow();
-  }
-});
+                    let qs;
+                    try {
+                        qs = queryString.parse(deeplinkingUrl);
+                    } catch (error) {
+                        console.log(error);
+                        return;
+                    }
+
+                    if (qs) {
+                        mainWindow.webContents.send('deeplink', qs);
+                    }
+                }
+
+            }
+        })
+    
+        let defaultPath;
+        try {
+            defaultPath = path.resolve(argv[1]);
+        } catch (error) {
+            console.log(error)
+        }
+        app.setAsDefaultProtocolClient('beet', process.execPath, [defaultPath])
+
+        app.whenReady().then(() => {
+            createWindow();
+        });       
+    }
+} else {
+    app.setAsDefaultProtocolClient('beet')
+
+    // mac or linux
+    app.whenReady().then(() => {
+        createWindow()
+    })
+    
+    // Handle the protocol. In this case, we choose to show an Error Box.
+    app.on('open-url', (event, url) => {
+        let deeplinkingUrl = url.replace('beet://api/', '');
+
+        let qs;
+        try {
+            qs = queryString.parse(deeplinkingUrl);
+        } catch (error) {
+            console.log(error);
+            return;
+        }
+
+        if (qs) {
+            mainWindow.webContents.send('deeplink', qs);
+        }
+    })
+
+    // This method will be called when Electron has finished
+    // initialization and is ready to create browser windows.
+    // Some APIs can only be used after this event occurs.
+    // Quit when all windows are closed.
+    app.on('window-all-closed', () => {
+        // On OS X it is common for applications and their menu bar
+        // to stay active until the user quits explicitly with Cmd + Q
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
+    
+    app.on('activate', () => {
+        // On OS X it's common to re-create a window in the app when the
+        // dock icon is clicked and there are no other windows open.
+        if (mainWindow === null) {
+            createWindow();
+        }
+    });
+}
+

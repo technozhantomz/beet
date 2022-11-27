@@ -1,6 +1,8 @@
 import store from "../../store";
 import {formatAsset, humanReadableFloat} from "../assetUtils";
 import RendererLogger from "../RendererLogger";
+import * as Actions from '../Actions';
+
 const logger = new RendererLogger();
 
 import mitt from 'mitt';
@@ -15,6 +17,7 @@ export default class BlockchainAPI {
         this._isConnected = false;
         this._isConnectingInProgress = false;
         this._isConnectedToNode = null;
+        this._blockedAddresses = [];
     }
 
     /*
@@ -22,12 +25,18 @@ export default class BlockchainAPI {
      * @param {String||Null} nodeToConnect
      * @returns {Promise} connection
      */
-    ensureConnection(nodeToConnect = null) {
-        return new Promise((resolve, reject) => {
+    async ensureConnection(nodeToConnect = null) {
+        return new Promise(async (resolve, reject) => {
             if (nodeToConnect && this._isConnectedToNode !== nodeToConnect) {
                 // enforce connection to that node
                 this._isConnected = false;
                 this._isConnectedToNode = null;
+            }
+
+            let badConnection = await this._needsNewConnection();
+            if (!nodeToConnect && !badConnection) {
+                console.log(`Using existing connection: ${this._isConnectedToNode}`);
+                return this._connectionEstablished(resolve, this._isConnectedToNode);
             }
 
             if (this._isConnectingInProgress) {
@@ -45,22 +54,17 @@ export default class BlockchainAPI {
                     }
                 }, 4000);
                 return;
+            } else {
+                this._isConnectingInProgress = true;
             }
-
-            if (!this._needsReconnecting()) {
-              console.log(`Using existing connection: ${this._isConnectedToNode}`);
-              return this._connectionEstablished(resolve, this._isConnectedToNode);
-            }
-
-            this._isConnectingInProgress = true;
 
             this._connect(nodeToConnect).then((res) => {
                 this._isConnectingInProgress = false;
                 this._isConnected = true;
-                resolve(res);
+                return resolve(res);
             }).catch((error) => {
                 console.log(error);
-                reject(error);
+                return reject(error);
             });
         });
     }
@@ -103,10 +107,10 @@ export default class BlockchainAPI {
      * Signing a string with a key
      * @param {string} key
      * @param {String} accountName
-     * @param {String} randomString
+     * @param {String} messageText
      * @returns {Promise}
      */
-    signMessage(key, accountName, randomString) {
+    signMessage(key, accountName, messageText) {
         return new Promise((resolve,reject) => {
             // do as a list, to preserve order
             let message = [
@@ -117,7 +121,7 @@ export default class BlockchainAPI {
                 "time",
                 new Date().toUTCString(),
                 "text",
-                randomString
+                messageText
             ];
             if (this._config.identifier !== message[2].substring(0, 3)) {
                 message.push("chain");
@@ -397,7 +401,80 @@ export default class BlockchainAPI {
      * Placeholder for blockchain specific reconnection
      * @returns {Boolean} connection
      */
-    _needsReconnecting() {
+    _needsNewConnection() {
+        return false;
+    }
+
+    /**
+     * Returning the list of injectable operations
+     * @returns {Array}
+     */
+     getOperationTypes() {
+        return [
+            {
+                id: Actions.GET_ACCOUNT,
+                from: '',
+                method: Actions.GET_ACCOUNT
+            },
+            {
+                id: Actions.REQUEST_SIGNATURE,
+                from: '',
+                method: Actions.REQUEST_SIGNATURE
+            },
+            {
+                id: Actions.INJECTED_CALL,
+                from: '',
+                method: Actions.INJECTED_CALL
+            },
+            {
+                id: Actions.VOTE_FOR,
+                from: '',
+                method: Actions.VOTE_FOR
+            },
+            {
+                id: Actions.SIGN_MESSAGE,
+                from: '',
+                method: Actions.SIGN_MESSAGE
+            },
+            {
+                id: Actions.SIGN_NFT,
+                from: '',
+                method: Actions.SIGN_NFT
+            },
+            {
+                id: Actions.VERIFY_MESSAGE,
+                from: '',
+                method: Actions.VERIFY_MESSAGE
+            },
+            {
+                id: Actions.TRANSFER,
+                from: '',
+                method: Actions.TRANSFER
+            }
+        ];
+    }
+
+    /**
+     * Placeholder for blockchain specific QR code processing
+     * @param {Object} contents 
+     */
+    handleQR(contents) {
+        throw "Needs implementation";
+    }
+
+    /**
+     * Placeholder for blockchain TOTP implementation
+     * @returns Boolean
+     */
+     supportsTOTP() {
+        return false;
+    }
+
+    /**
+     * Placeholder for blockchain QR implementation
+     * @returns Boolean
+     */
+     supportsQR() {
         return false;
     }
 
@@ -498,6 +575,14 @@ export default class BlockchainAPI {
     }
 
     /*
+    * Fetch account/address list to warn users about
+    * @returns {Array}
+    */
+    getBlockedAccounts() {
+        return false;
+    }
+
+    /*
      * Placeholder for retrieving a blockchain explorer URL
      * @returns {String}
      */
@@ -510,6 +595,14 @@ export default class BlockchainAPI {
      * @returns {String}
      */
     visualize(thing) {
+        return false;
+    }
+
+    /*
+     * Placeholder for signing nfts
+     * @returns {String}
+     */
+    signNFT(thing) {
         return false;
     }
 
